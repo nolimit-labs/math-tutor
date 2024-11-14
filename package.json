@@ -6,19 +6,22 @@
   "scripts": {
     "dev": "concurrently \"vite\" \"node server/index.js\"",
     "build": "vite build",
-    "lint": "eslint .",
-    "migrate": "node server/db/migrate.js"
+    "lint": "eslint ."
   },
   "dependencies": {
-    "lucide-react": "^0.344.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "openai": "^4.28.0",
-    "express": "^4.18.2",
+    "@types/react-router-dom": "^5.3.3",
+    "bcrypt": "^5.1.1",
+    "concurrently": "^8.2.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "concurrently": "^8.2.2",
-    "pg": "^8.11.3"
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.344.0",
+    "openai": "^4.28.0",
+    "pg": "^8.11.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.5",
