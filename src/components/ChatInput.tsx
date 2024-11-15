@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Send } from 'lucide-react';
+import { Send, BookOpen } from 'lucide-react';
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
+  onQuizStart: () => void;
   isLoading: boolean;
 }
 
-export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
+export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, onQuizStart, isLoading }) => {
   const [message, setMessage] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -27,6 +28,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }
         className="flex-1 p-4 rounded-xl border-2 border-blue-200 focus:border-blue-400 focus:outline-none text-lg"
         disabled={isLoading}
       />
+      <button
+        type="button"
+        onClick={onQuizStart}
+        className="p-4 bg-blue-100 text-blue-500 rounded-xl hover:bg-blue-200 transition-colors"
+      >
+        <BookOpen size={24} />
+      </button>
       <button
         type="submit"
         disabled={isLoading || !message.trim()}

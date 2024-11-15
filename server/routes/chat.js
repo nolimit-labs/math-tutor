@@ -4,82 +4,101 @@ import { pool } from '../db/index.js';
 
 const router = Router();
 
-router.post('/', async (req, res, next) => {
+router.post('/', async (req, res) => {
   const { messages, grade, isFirstResponse } = req.body;
-  const client = await pool.connect();
   
   try {
-    await client.query('BEGIN');
-    
-    const systemMessage = isFirstResponse ? 
-      {
-        role: "system",
-        content: `You are Math Buddy, a patient and encouraging Grade ${grade} math teacher. 
-          The student has just indicated they want to begin the lesson.
-          
-          Your next response should:
-          1. Express enthusiasm for teaching
-          2. Briefly outline 3-4 key topics you'll cover today
-          3. Start with the first topic
-          4. Ask an engaging opening question about the first topic
-          
-          Keep the response friendly and encouraging.
-          Use age-appropriate language for Grade ${grade}.
-          Make the student feel comfortable and excited to learn.`
-      } :
-      {
-        role: "system",
-        content: `You are Math Buddy, a patient and encouraging Grade ${grade} math teacher. 
-          Your responses should:
-          - Teach grade-appropriate math concepts
-          - Use age-appropriate language
-          - Provide step-by-step explanations
-          - Give practice problems when appropriate
-          - Offer hints before solutions
-          - Celebrate student success
-          - Break down complex problems
-          - Use real-world examples
-          
-          If a student is struggling:
-          1. Ask what part they find difficult
-          2. Provide a simpler example
-          3. Guide them through step by step
-          
-          Keep responses engaging and encouraging.
-          Maintain an appropriate difficulty level for Grade ${grade}.
-          Suggest related topics they might want to learn about next.
-          
-          Remember where you are in the lesson plan you previously outlined.
-          Build upon previous concepts as you progress through the topics.`
-      };
+    // Define system message based on grade
+    const systemMessage = {
+      role: "system",
+      content: `You are a friendly and encouraging math teacher for Grade ${grade}. 
+                Explain concepts clearly and simply, using age-appropriate language. 
+                Break down complex problems into smaller steps. 
+                Provide positive reinforcement and gentle correction when needed.
+                Keep responses concise and focused.`
+    };
 
-    const response = await openai.chat.completions.create({
+    // Get chat response
+    const chatResponse = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         systemMessage,
-        ...messages
+        ...messages.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }))
       ],
       temperature: 0.7,
       max_tokens: 400,
     });
 
-    const botMessage = response.choices[0]?.message;
-    
-    const userMessage = messages[messages.length - 1].content;
-    const insertQuery = `
-      INSERT INTO conversations (user_id, user_message, bot_message, grade)
-      VALUES ($1, $2, $3, $4)
-      RETURNING id
-    `;
-    await client.query(insertQuery, [req.userId, userMessage, botMessage.content, grade]);
-    
-    await client.query('COMMIT');
-    res.json(botMessage);
+    // Store conversation in database
+    await pool.query(
+      'INSERT INTO conversations (user_id, user_message, bot_message, grade) VALUES ($1, $2, $3, $4)',
+      [
+        req.userId,
+        messages[messages.length - 1].content,
+        chatResponse.choices[0].message.content,
+        grade
+      ]
+    );
+
+    // Analyze if quiz would be appropriate
+    const lastMessages = messages.slice(-3);
+    const analysisPrompt = `Analyze these messages and determine if a quiz would be appropriate.
+      If yes, identify the specific topic to quiz on.
+      
+      Messages:
+      ${JSON.stringify(lastMessages)}
+      
+      Consider:
+      1. Has a topic been thoroughly discussed?
+      2. Has the student demonstrated understanding?
+      3. Is this a good moment to test knowledge?
+      
+      Respond in this exact format (including curly braces):
+      {suggestQuiz: true/false, topic: "specific topic"}`;
+
+    const quizAnalysis = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You are a math education expert." },
+        { role: "user", content: analysisPrompt }
+      ],
+      temperature: 0.3, // Lower temperature for more consistent formatting
+    });
+
+    // Parse the response manually
+    const analysisText = quizAnalysis.choices[0].message.content;
+    let analysis;
+    try {
+      // Extract the JSON-like string and parse it
+      const jsonStr = analysisText.match(/\{.*\}/)?.[0];
+      analysis = jsonStr ? eval(`(${jsonStr})`) : { suggestQuiz: false };
+    } catch (e) {
+      console.error('Failed to parse quiz analysis:', e);
+      analysis = { suggestQuiz: false };
+    }
+
+    const response = {
+      content: chatResponse.choices[0].message.content
+    };
+
+    // If quiz is suggested, add quiz suggestion
+    if (analysis.suggestQuiz) {
+      response.quizSuggestion = {
+        topic: analysis.topic,
+        grade
+      };
+    }
+
+    res.json(response);
   } catch (error) {
-    await client.query('ROLLBACK');
-    next(error);
-  } finally {
-    client.release();
+    console.error('Error in chat:', error);
+    res.status(500).json({ 
+      error: 'Failed to process chat message',
+      details: error.message 
+    });
   }
 });
 

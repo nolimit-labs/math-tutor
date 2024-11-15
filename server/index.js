@@ -6,6 +6,7 @@ import { router as authRouter } from './routes/auth.js';
 import { auth } from './middleware/auth.js';
 import chatRouter from './routes/chat.js';
 import historyRouter from './routes/history.js';
+import quizRouter from './routes/quiz.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -31,6 +32,7 @@ app.use('/api/auth', authRouter);
 // Protected routes
 app.use('/api/chat', auth, chatRouter);
 app.use('/api/history', auth, historyRouter);
+app.use('/api/quiz', quizRouter);
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
